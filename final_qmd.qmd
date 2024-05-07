@@ -1,114 +1,44 @@
 ---
-title: "Multidimensional Poverty"
-format: html
-editor: visual
+title: "Predicting Multidimensional Poverty using spatial data"
+subtitle: "Final project - Data Science for Public Policy"
+authors: "Jasmine Jha, David Gentili, Duana Blach, Maddie Dimarco"
+execute:
+  warning: false
+  message: false
+format:
+  html:
+    embed-resources: true
 ---
 
-## Quarto
+## Background and Literature Review
 
 Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
 
-## Set up
+## Data Sources
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this
 
-```{r}
-library(sf)
-library(ggspatial)
-library(osmdata)
-library(tidyverse)
-library(ggthemes)
-
-#This is to upload the whole geographic MPI data for Colombia into an sf file.
-col_sf <- read_sf("C:/Users/David/OneDrive/Documents/final_project_ds/medellin/VULNRB_IPMxMZ.shp")
-
-names(col_sf)
-
-#Filtering the information for Medellin, and droping variables that we don't need.
-med_sf <- col_sf %>%
-  filter(COD_MPIO == "05001", ipm !=0, ipm != 100, !is.na(ipm) )%>%
-  select(COD_MPIO, ipm, geometry)
-
-#Converting the CRS of the sf file to the "normal" one
-med_sf_wgs84 <- med_sf %>%
-  st_transform(crs = 4326)
-
-#This generate the "bounding box" from the Medellin sf data. This is needed to do the 
-#query to Open Street Map to download a bunch of geographical information in Medellin.
-#A "bounding box" is a pair of coordinates of the smallest rectangle that encloses the city of Medellin.
-bbox1 <- st_bbox(med_sf_wgs84)
-
-#This is an example of how to download the bus stops in Medellin. We can do this for a bunch of other things.
-#Look at this web page to know the different keys and values we can use: https://wiki.openstreetmap.org/wiki/Map_features
-#bus_stops <- opq(bbox = bbox1)%>%
-#  add_osm_features(key = "highway", value = "bus_stop")%>%
-#  osmdata_sf()
-
-
-infrastructure <- opq(bbox = bbox1)%>%
-  add_osm_features(features = list("amenity" = "school",
-                                   "amenity" = "police",
-                                   "amenity" = "fire_station",
-                                   "amenity" = "bus_station",
-                                   "amenity" = "hospital",
-                                   "amenity" = "place_of_worship")) %>%
-                     osmdata_sf()
-
-#I don't understand this code well yet, but this is to transform the query into a usable dataframe.
-infrastructure_points <- bind_rows(
-  pluck(infrastructure, "osm_points"),
-  st_centroid(pluck(infrastructure, "osm_polygons"))
-)
-
-inf_points_clean <- infrastructure_points %>%
-  filter(!is.na(name))%>%
-  select(osm_id, name, amenity, geometry)
-
-
-ggplot()+
-  geom_sf(
-    data = med_sf_wgs84, aes(fill = ipm), color = "white", size = 0.1
-  )+
-  scale_fill_gradient(
-    low = "#cfe8f3", 
-    high = "#062635",
-  )+
-  theme_void()
-
-inf_points_clean$amenity_factor <- as.factor(inf_points_clean$amenity)
-
-ggplot() +
-  geom_sf(data = med_sf_wgs84, aes(fill = ipm), color = "white", size = 0.1) +
-  scale_fill_gradient(low = "#cfe8f3", high = "#062635") +
-  geom_sf(data = inf_points_clean, aes(color = amenity_factor), size = 1, alpha = 0.7) +
-  scale_color_manual(values = c(
-    school = "blue",
-    place_of_worship = "red",
-    hospital = "green",
-    police = "yellow",
-    fire_station = "purple",
-    bus_station = "hotpink"
-  )) +
-  theme_void()
-
-
-
-# Calculating distances:
-## 1. How to calculate using centroid. Also we have points and multipolygon variable.
-## 2. Mechanics of the calculation to get only the nearest points for each block.
-
-# Estimating the models:
-## 1.General recommendations about the machine learning models.
-
-# Show results:
-## 1. Recommendations on how to show the results at the end.
-```
-
-You can add options to executable code like this
+## Data Wrangling
 
 ```{r}
-#| echo: false
-2 * 2
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Data Analysis: Predicting Models
+
+### Supervised Machine Learning Models - Regression
+
+
+```{r}
+
+```
+
+### Supervised Machine Learning Models - Classification
+
+```{r}
+
+```
+
+## Discussion of Results
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
