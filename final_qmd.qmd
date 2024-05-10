@@ -12,7 +12,7 @@ format:
 
 ## Background and Literature Review
 
-We aim to study how to estimate the multidimensional poverty index (MPI) using spatial data at the street block level. In this attempt, we tried to replicate the paper \"Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data\" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz. We do so by using concepts that we have learnt in class. Therefore, it is a partial replication.
+We aim to study how to estimate the multidimensional poverty index (MPI) using spatial data at the street block level. In this attempt, we tried to replicate the paper "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz. We do so by using concepts that we have learnt in class. Therefore, it is a partial replication.
 
 Many economists, e.g., Prof. Amartya Sen, have pointed out that poverty is not just an income-based concept. They have done this through multiple approaches, like the human development income and capability approach (Muñetón-Santa and Manrique-Ruiz 2023). The shift in calculating poverty has moved beyond income and has incorporated health education and infrastructure. The multidimensional poverty index captures all these areas very well. While also including life with dignity as an important factor. 
 
@@ -36,9 +36,9 @@ As for our methodology, we are following Muñetón-Santa and Manrique-Ruiz (2023
 
 (source: Muñetón-Santa and Manrique-Ruiz (2023))
 
-However, in machine learning we are doing our own analysis and not following the one the paper suggests. We are also not using ESA\'s land use cover.
+However, in machine learning we are doing our own analysis and not following the one the paper suggests. We are also not using ESA's land use cover.
 
-# Bibliography
+### Bibliography
 
 Muñetón-Santa, Guberney, and Luis Carlos Manrique-Ruiz. 2023. "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data." *Social Sciences* 1-21.
 
