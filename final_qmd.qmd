@@ -48,7 +48,15 @@ UNDP, and OPHI. 2019. *How to Build a National Multidimensional Poverty Index (M
 
 ## Data Sources
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this
+We used multiple datasets for our project. To get the MPI values, we use the dataset by the National Department of Statistics (DANE by the Spanish acronym) for the year 2018. The data for MPI in the dataset is calculated at the block level. Each block is defined by the administrative department with its identifiers (Muñetón-Santa and Manrique-Ruiz 2023). As discussed above, the MPI calculation follows the AF method. This data is available at: https://geoportal.dane.gov.co/visipm/. The MPI in this data set will be used as the outcome of interest in our analysis. 
+
+For spatial data, we access the Open Street Map available from Planet OSM. We got the spatial data and using it calculated the nearest distance from the decided facility, which are, police stations, hospitals, schools, universities, churches, airports, banks, and bus stops. This information can be downloaded from Open Street Map using the library(osmdata). The information about this open-source portal can be found here: 
+
+-- https://www.openstreetmap.org/about
+
+-- https://www.openstreetmap.org/#map=12/10.8738/-74.9280 
+
+The codes which we used are mentioned below:
 
 ## Data Wrangling
 
