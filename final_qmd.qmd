@@ -12,33 +12,65 @@ format:
 
 ## Background and Literature Review
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+We aim to study how to estimate the multidimensional poverty index (MPI) using spatial data at the street block level. In this attempt, we tried to replicate the paper \"Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data\" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz. We do so by using concepts that we have learnt in class. Therefore, it is a partial replication.
+
+Many economists, e.g., Prof. Amartya Sen, have pointed out that poverty is not just an income-based concept. They have done this through multiple approaches, like the human development income and capability approach (Muñetón-Santa and Manrique-Ruiz 2023). The shift in calculating poverty has moved beyond income and has incorporated health education and infrastructure. The multidimensional poverty index captures all these areas very well. While also including life with dignity as an important factor. 
+
+However, calculating MPIs can be heavily based on census data. Census data is calculated every ten years and is a costly affair (Muñetón-Santa and Manrique-Ruiz 2023). The government requires MPI data to analyze the country's development status and use this data to establish targets and solutions. The paper referenced here has done a fantastic job of using spatial data at the street block level to estimate MPIs. We think of it as a good practice because it will not just lower the cost of calculating the MPIs but also help us understand the role these services play in impacting poverty and living standards on the individuals and might simultaneously provide the government with a prospective solution.
+
+### Literature Review:
+
+How to Build a National Multidimensional Poverty Index (MPI): Using the MPI to inform the SDGs paper authored by the United Nations Development Programme (UNDP) and Oxford Poverty and Human Development Initiative (OPHI) in their paper explains MPI and its construction. In the past, there has been a global shift away from calculating poverty based on lack of access to money. An individual can be malnourished and have a lack of access to clean water or health facilities (UNDP and OPHI, How to Build a National Multidimensional Poverty Index (MPI): Using the MPI to inform the SDGs 2019). The MPI acknowledges the lack of access to basic facilities and considers life with dignity to be an important factor. 
+
+According to the paper UNDP and OPHI, Multidimensional Poverty and the AF method n.d., we are going to explain the calculation for MPI utilizing the AF (Alkire-Foster) method. AF method satisfies most of the requirements focusing on life with dignity. The AF method uses and generates three key statistics:
+
+1\. Incidence (H): It is the headcount ratio of the poor in the area. 
+
+2\. Intensity (A): It is the deprivation score among poor people. It is the weighted average of the indicators that are deprived to the poor.
+
+3\. MPI: The MPI is calculated by multiplying H and A. It represents the share of deprivation that the poor face. It ranges from 0 to 1, where 0 = no poverty and 1 = universal poverty. 
+
+In our project, we use MPI in percentage values. Therefore, 0 to 100. The threshold for poverty is 33 per cent. 
+
+As for our methodology, we are following Muñetón-Santa and Manrique-Ruiz (2023).  
+
+(source: Muñetón-Santa and Manrique-Ruiz (2023))
+
+However, in machine learning we are doing our own analysis and not following the one the paper suggests. We are also not using ESA\'s land use cover.
+
+# Bibliography
+
+Muñetón-Santa, Guberney, and Luis Carlos Manrique-Ruiz. 2023. "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data." *Social Sciences* 1-21.
+
+UNDP, and OPHI. 2019. *How to Build a National Multidimensional Poverty Index (MPI): Using the MPI to inform the SDGs.* New York: United Nations Development Programme.
+
+---. n.d. *Multidimensional Poverty and the AF method .* Accessed May Friday, 2024. https://ophi.org.uk/md-poverty-and-AF-method.
 
 ## Data Sources
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this
 
 ## Data Wrangling
-To create the final data frame, we collected data from different sources, as described in the previous session. Our main goal was to have a dataset for Medellín blocks with the closest distance from different public services. We worked to create a data frame where each Meddelín block was one row, and the distances from the closest public service (referred to as an amenity) were columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship.  Hence, the goal was to have, for each block, one column for each category of amenity, with the distance from the closest one. 
 
-We tried different approaches to address this goal, including creating a loop, calculating all distances separately, using "data.table", etc. However, some approaches did not work, passing the software's maximum capacity. After multiple trials and searches, we figured out a solution, which is described below. 
+To create the final data frame, we collected data from different sources, as described in the previous session. Our main goal was to have a dataset for Medellín blocks with the closest distance from different public services. We worked to create a data frame where each Meddelín block was one row, and the distances from the closest public service (referred to as an amenity) were columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship. Hence, the goal was to have, for each block, one column for each category of amenity, with the distance from the closest one.
 
-To address this goal, we first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps per amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block. 
+We tried different approaches to address this goal, including creating a loop, calculating all distances separately, using "data.table", etc. However, some approaches did not work, passing the software's maximum capacity. After multiple trials and searches, we figured out a solution, which is described below.
 
-We generated block IDs for each block and divided the calculation into groups for amenities categories with a larger number of units to facilitate the code's running. For these categories we merged the groups after calculating them. 
+To address this goal, we first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps per amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block.
 
-After these steps, we had one data frame for each amenity distance calculation. We then combined all the datasets using the left_join command. 
+We generated block IDs for each block and divided the calculation into groups for amenities categories with a larger number of units to facilitate the code's running. For these categories we merged the groups after calculating them.
+
+After these steps, we had one data frame for each amenity distance calculation. We then combined all the datasets using the left_join command.
 
 Finally, we saved the final dataset with only the needed columns and downloaded the data frame separately. The objective of having this data separately created is to be used in the next part of this project without the necessity to run this distance calculation code again. This qmd became heavy with all the calculations, taking more than 40 minutes to run on average.
 
-There was no missing data or need to be cleaned out. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues. 
+There was no missing data or need to be cleaned out. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues.
 
-The code is available on "data_wrangling_medellin.qmd". We kept it separately aiming for the best performance on this qmd. 
+The code is available on "data_wrangling_medellin.qmd". We kept it separately aiming for the best performance on this qmd.
 
 ## Data Analysis: Predicting Models
 
 ### Supervised Machine Learning Models - Regression
-
 
 ```{r}
 
