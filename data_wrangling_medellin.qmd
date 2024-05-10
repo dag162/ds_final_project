@@ -1,0 +1,849 @@
+---
+title: "Multidimensional Poverty"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Set up
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(sf)
+library(ggspatial)
+library(osmdata)
+library(tidyverse)
+library(ggthemes)
+library(dplyr)
+
+
+setwd("C:/Users/duana/OneDrive/McCourt_MIDP/Sem2/IntroDataScience/Final_Proj/Final_Proj")
+
+#unzip file (if needed)
+unzip("C:/Users/duana/OneDrive/McCourt_MIDP/Sem2/IntroDataScience/Final_Proj/Final_Proj/ds_final_project/data/VULNRB_IPMxMZ.zip")
+
+#This is to upload the whole geographic MPI data for Colombia into an sf file.
+col_sf <- read_sf("C:/Users/duana/OneDrive/McCourt_MIDP/Sem2/IntroDataScience/Final_Proj/Final_Proj/VULNRB_IPMxMZ.shp")
+
+names(col_sf)
+
+#Filtering the information for Medellin, and droping variables that we don't need.
+med_sf <- col_sf %>%
+  filter(COD_MPIO == "05001", ipm !=0, ipm != 100, !is.na(ipm) )%>%
+  select(COD_MPIO, ipm, geometry)
+
+rm(col_sf)
+
+#Converting the CRS of the sf file to the "normal" one
+med_sf_wgs84 <- med_sf %>%
+  st_transform(crs = 4326)
+
+#This generate the "bounding box" from the Medellin sf data. This is needed to do the 
+#query to Open Street Map to download a bunch of geographical information in Medellin.
+#A "bounding box" is a pair of coordinates of the smallest rectangle that encloses the city of Medellin.
+bbox1 <- st_bbox(med_sf_wgs84)
+
+#This is an example of how to download the bus stops in Medellin. We can do this for a bunch of other things.
+#Look at this web page to know the different keys and values we can use: https://wiki.openstreetmap.org/wiki/Map_features
+#bus_stops <- opq(bbox = bbox1)%>%
+#  add_osm_features(key = "highway", value = "bus_stop")%>%
+#  osmdata_sf()
+
+
+infrastructure <- opq(bbox = bbox1)%>%
+  add_osm_features(features = list("amenity" = "school",
+                                   "amenity" = "police",
+                                   "amenity" = "fire_station",
+                                   "amenity" = "bus_station",
+                                   "amenity" = "hospital",
+                                   "amenity" = "place_of_worship")) %>%
+                     osmdata_sf()
+
+#I don't understand this code well yet, but this is to transform the query into a usable dataframe.
+infrastructure_points <- bind_rows(
+  pluck(infrastructure, "osm_points"),
+  st_centroid(pluck(infrastructure, "osm_polygons"))
+)
+
+inf_points_clean <- infrastructure_points %>%
+  filter(!is.na(name))%>%
+  select(osm_id, name, amenity, geometry)
+
+
+
+# Calculating distances:
+## 1. How to calculate using centroid. Also we have points and multipolygon variable.
+## 2. Mechanics of the calculation to get only the nearest points for each block.
+
+# Estimating the models:
+## 1.General recommendations about the machine learning models.
+
+# Show results:
+## 1. Recommendations on how to show the results at the end.
+```
+
+You can add options to executable code like this
+
+```{r}
+
+# Calculating distances:
+## 1. How to calculate using centroid. Also we have points and multipolygon variable.
+
+# Read your polygon data (replace 'nc.shp' with your shapefile)
+med_sf_trial <- med_sf %>%
+    st_transform(32617)  # Transform to UTM (recommended for st_centroid)
+
+# Calculate centroids
+sf_cent <- st_centroid(med_sf_trial)
+
+
+```
+
+School
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+
+## Setting to create the distance calculation
+
+inf_points_clean <- inf_points_clean %>%
+    st_transform(32617)
+
+sf_cent <- st_transform(sf_cent, crs = "+proj=longlat +datum=WGS84")
+
+# Add a unique identifier for each block in sf_cent
+sf_cent <- sf_cent %>%
+  mutate(block_id = row_number())
+
+
+##### 1 - SCHOOLS
+
+
+## Setting up the variables for this public service
+school_amenities <- inf_points_clean %>%
+  filter(amenity == "school")
+
+school_amenities <- school_amenities %>%
+  rename(school_geometry = geometry)
+
+
+
+### Creating a model with a small sample: 10 blocks
+sf_cent_trial <- sf_cent %>%
+  filter(block_id %in% 1:10)
+
+## Combining the data for this public service
+combine_schools <- expand_grid(sf_cent_trial, school_amenities)
+
+if (st_crs(combine_schools$geometry) != st_crs(combine_schools$school_geometry)) {
+  combine_schools$school_geometry <- st_transform(combine_schools$school_geometry, st_crs(combine_schools$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+combine_schools <- combine_schools %>%
+  select(-starts_with("dist"))
+
+min_distances <- combine_schools %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 1 - blocks 1 - 1000 
+
+library(tidyr)
+sf_cent_trial_g1 <- sf_cent %>%
+  filter(block_id %in% 1:1000)
+
+## Combining the data for this public service
+combine_schools_g1 <- expand_grid(sf_cent_trial_g1, school_amenities)
+
+if (st_crs(combine_schools_g1$geometry) != st_crs(combine_schools_g1$school_geometry)) {
+  combine_schools_g1$school_geometry <- st_transform(combine_schools_g1$school_geometry, st_crs(combine_schools_g1$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g1 <- combine_schools_g1 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 2 - blocks 1001 - 2000 
+
+library(tidyr)
+sf_cent_trial_g2 <- sf_cent %>%
+  filter(block_id %in% 1001:2000)
+
+## Combining the data for this public service
+combine_schools_g2 <- expand_grid(sf_cent_trial_g2, school_amenities)
+
+if (st_crs(combine_schools_g2$geometry) != st_crs(combine_schools_g2$school_geometry)) {
+  combine_schools_g2$school_geometry <- st_transform(combine_schools_g2$school_geometry, st_crs(combine_schools_g2$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g2 <- combine_schools_g2 %>%
+  group_by(block_id) %>%
+  summarize(min_distance_g2 = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 3 - blocks 2001 - 3000 
+
+library(tidyr)
+sf_cent_trial_g3 <- sf_cent %>%
+  filter(block_id %in% 2001:3000)
+
+## Combining the data for this public service
+combine_schools_g3 <- expand_grid(sf_cent_trial_g3, school_amenities)
+
+if (st_crs(combine_schools_g3$geometry) != st_crs(combine_schools_g3$school_geometry)) {
+  combine_schools_g3$school_geometry <- st_transform(combine_schools_g3$school_geometry, st_crs(combine_schools_g3$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g3 <- combine_schools_g3 %>%
+  group_by(block_id) %>%
+  summarize(min_distance_g3 = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 4 - blocks 3001 - 4000 
+
+library(tidyr)
+sf_cent_trial_g4 <- sf_cent %>%
+  filter(block_id %in% 3001:4000)
+
+## Combining the data for this public service
+combine_schools_g4 <- expand_grid(sf_cent_trial_g4, school_amenities)
+
+if (st_crs(combine_schools_g4$geometry) != st_crs(combine_schools_g4$school_geometry)) {
+  combine_schools_g4$school_geometry <- st_transform(combine_schools_g4$school_geometry, st_crs(combine_schools_g4$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g4 <- combine_schools_g4 %>%
+  group_by(block_id) %>%
+  summarize(min_distance_g4 = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 5 - blocks 4001 - 5000 
+
+library(tidyr)
+sf_cent_trial_g5 <- sf_cent %>%
+  filter(block_id %in% 4001:5000)
+
+## Combining the data for this public service
+combine_schools_g5 <- expand_grid(sf_cent_trial_g5, school_amenities)
+
+if (st_crs(combine_schools_g5$geometry) != st_crs(combine_schools_g5$school_geometry)) {
+  combine_schools_g5$school_geometry <- st_transform(combine_schools_g5$school_geometry, st_crs(combine_schools_g5$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g5 <- combine_schools_g5 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 6 - blocks 5001 - 6000 
+
+library(tidyr)
+sf_cent_trial_g6 <- sf_cent %>%
+  filter(block_id %in% 5001:6000)
+
+## Combining the data for this public service
+combine_schools_g6 <- expand_grid(sf_cent_trial_g6, school_amenities)
+
+if (st_crs(combine_schools_g6$geometry) != st_crs(combine_schools_g6$school_geometry)) {
+  combine_schools_g6$school_geometry <- st_transform(combine_schools_g6$school_geometry, st_crs(combine_schools_g6$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g6 <- combine_schools_g6 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 7 - blocks 6001 - 7000 
+
+library(tidyr)
+sf_cent_trial_g7 <- sf_cent %>%
+  filter(block_id %in% 6001:7000)
+
+## Combining the data for this public service
+combine_schools_g7 <- expand_grid(sf_cent_trial_g7, school_amenities)
+
+if (st_crs(combine_schools_g7$geometry) != st_crs(combine_schools_g7$school_geometry)) {
+  combine_schools_g7$school_geometry <- st_transform(combine_schools_g7$school_geometry, st_crs(combine_schools_g7$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g7 <- combine_schools_g7 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 8 - blocks 7001 - 8000 
+
+library(tidyr)
+sf_cent_trial_g8 <- sf_cent %>%
+  filter(block_id %in% 7001:8000)
+
+## Combining the data for this public service
+combine_schools_g8 <- expand_grid(sf_cent_trial_g8, school_amenities)
+
+if (st_crs(combine_schools_g8$geometry) != st_crs(combine_schools_g8$school_geometry)) {
+  combine_schools_g8$school_geometry <- st_transform(combine_schools_g8$school_geometry, st_crs(combine_schools_g8$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g8 <- combine_schools_g8 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 9 - blocks 8001 - 9000 
+
+library(tidyr)
+sf_cent_trial_g9 <- sf_cent %>%
+  filter(block_id %in% 8001:9000)
+
+## Combining the data for this public service
+combine_schools_g9 <- expand_grid(sf_cent_trial_g9, school_amenities)
+
+if (st_crs(combine_schools_g9$geometry) != st_crs(combine_schools_g9$school_geometry)) {
+  combine_schools_g9$school_geometry <- st_transform(combine_schools_g9$school_geometry, st_crs(combine_schools_g9$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g9 <- combine_schools_g9 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 10 - blocks 9001 - 10501
+
+library(tidyr)
+sf_cent_trial_g10 <- sf_cent %>%
+  filter(block_id %in% 9001:10501)
+
+## Combining the data for this public service
+combine_schools_g10 <- expand_grid(sf_cent_trial_g10, school_amenities)
+
+if (st_crs(combine_schools_g10$geometry) != st_crs(combine_schools_g10$school_geometry)) {
+  combine_schools_g10$school_geometry <- st_transform(combine_schools_g10$school_geometry, st_crs(combine_schools_g10$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_g10 <- combine_schools_g10 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, school_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of school distances to one dataset
+
+combined_data_school <- bind_rows(min_distances_g1, min_distances_g2, min_distances_g3, min_distances_g4, min_distances_g5, min_distances_g6, min_distances_g7, min_distances_g8, min_distances_g9, min_distances_g10)
+
+# Creating a file with all this info
+write.csv(combined_data_school, "medellin_school_distances.csv", row.names = TRUE)
+```
+
+Hospitals
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+##### 2 - HOSPITALS 
+
+
+## Setting up the variables for this public service
+hospital_amenities <- inf_points_clean %>%
+  filter(amenity == "hospital")
+
+hospital_amenities <- hospital_amenities %>%
+  rename(hospital_geometry = geometry)
+
+```
+
+```{r}
+### Calculating for each 5000 blocks at a time 
+  # group 1 - blocks 1 - 5000 
+
+library(tidyr)
+sf_cent_trial_g1_h <- sf_cent %>%
+  filter(block_id %in% 1:5000)
+
+## Combining the data for this public service
+combine_hospitals_g1 <- expand_grid(sf_cent_trial_g1_h, hospital_amenities)
+
+if (st_crs(combine_hospitals_g1$geometry) != st_crs(combine_hospitals_g1$hospital_geometry)) {
+  combine_hospitals_g1$hospital_geometry <- st_transform(combine_hospitals_g1$hospital_geometry, st_crs(combine_hospitals_g1$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_hospital_g1 <- combine_hospitals_g1 %>%
+  group_by(block_id) %>%
+  summarize(min_distance_hospital = min(st_distance(geometry, hospital_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 5000 blocks at a time 
+  # group 2 - blocks 5001 - 10501 
+
+library(tidyr)
+sf_cent_trial_g2_h <- sf_cent %>%
+  filter(block_id %in% 5001:10501)
+
+## Combining the data for this public service
+combine_hospitals_g2 <- expand_grid(sf_cent_trial_g2_h, hospital_amenities)
+
+if (st_crs(combine_hospitals_g2$geometry) != st_crs(combine_hospitals_g2$hospital_geometry)) {
+  combine_hospitals_g2$hospital_geometry <- st_transform(combine_hospitals_g2$hospital_geometry, st_crs(combine_hospitals_g2$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_hospital_g2 <- combine_hospitals_g2 %>%
+  group_by(block_id) %>%
+  summarize(min_distance_hospital = min(st_distance(geometry, hospital_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of hospitals to one dataset
+
+combined_data_hospital <- bind_rows(min_distances_hospital_g1, min_distances_hospital_g2)
+
+# Creating a file with all this info
+write.csv(combined_data_hospital, "medellin_hospital_distances.csv", row.names = TRUE)
+```
+
+Bus stations
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+##### 3 - BUS STATIONS 
+
+
+## Setting up the variables for this public service
+bus_amenities <- inf_points_clean %>%
+  filter(amenity == "bus_station")
+
+bus_amenities <- bus_amenities %>%
+  rename(bus_geometry = geometry)
+
+```
+
+```{r}
+### Calculating for all at once 
+
+library(tidyr)
+
+## Combining the data for this public service
+combine_bus <- expand_grid(sf_cent, bus_amenities)
+
+if (st_crs(combine_bus$geometry) != st_crs(combine_bus$bus_geometry)) {
+  combine_bus$bus_geometry <- st_transform(combine_bus$bus_geometry, st_crs(combine_bus$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_bus <- combine_bus %>%
+  group_by(block_id) %>%
+  summarize(min_distance_bus = min(st_distance(geometry, bus_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of bus stops to one dataset
+
+combined_data_bus <- min_distances_bus
+
+# Creating a file with all this info
+write.csv(combined_data_bus, "medellin_bus_distances.csv", row.names = TRUE)
+```
+
+Fire stations
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+##### 4 - FIRE STATIONS
+
+
+## Setting up the variables for this public service
+fire_amenities <- inf_points_clean %>%
+  filter(amenity == "fire_station")
+
+fire_amenities <- fire_amenities %>%
+  rename(fire_geometry = geometry)
+
+```
+
+```{r}
+### Calculating for all at once 
+
+library(tidyr)
+
+## Combining the data for this public service
+combine_fire <- expand_grid(sf_cent, fire_amenities)
+
+if (st_crs(combine_fire$geometry) != st_crs(combine_fire$fire_geometry)) {
+  combine_fire$fire_geometry <- st_transform(combine_fire$fire_geometry, st_crs(combine_fire$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_fire <- combine_fire %>%
+  group_by(block_id) %>%
+  summarize(min_distance_fire = min(st_distance(geometry, fire_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of bus stops to one dataset
+
+combined_data_fire <- min_distances_fire
+
+# Creating a file with all this info
+write.csv(combined_data_fire, "medellin_fire_distances.csv", row.names = TRUE)
+```
+
+Police
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+##### 5 - POLICE
+
+
+## Setting up the variables for this public service
+police_amenities <- inf_points_clean %>%
+  filter(amenity == "police")
+
+police_amenities <- police_amenities %>%
+  rename(police_geometry = geometry)
+```
+
+```{r}
+### Calculating for all at once 
+
+library(tidyr)
+
+## Combining the data for this public service
+combine_police <- expand_grid(sf_cent, police_amenities)
+
+if (st_crs(combine_police$geometry) != st_crs(combine_police$police_geometry)) {
+  combine_police$police_geometry <- st_transform(combine_police$police_geometry, st_crs(combine_police$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_police <- combine_police %>%
+  group_by(block_id) %>%
+  summarize(min_distance_police = min(st_distance(geometry, police_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of bus stops to one dataset
+
+combined_data_police <- min_distances_police
+
+# Creating a file with all this info
+write.csv(combined_data_police, "medellin_police_distances.csv", row.names = TRUE)
+```
+
+PLACE OF WORSHIP
+
+```{r}
+##### CALCULATING DISTANCES (from centroids to public services)
+
+##### 6 - WORSHIP
+
+
+## Setting up the variables for this public service
+worship_amenities <- inf_points_clean %>%
+  filter(amenity == "place_of_worship")
+
+worship_amenities <- worship_amenities %>%
+  rename(worship_geometry = geometry)
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 1 - blocks 1 - 1000 
+
+
+## Combining the data for this public service
+combine_worship_g1 <- expand_grid(sf_cent_trial_g1, worship_amenities)
+
+if (st_crs(combine_worship_g1$geometry) != st_crs(combine_worship_g1$worship_geometry)) {
+  combine_worship_g1$worship_geometry <- st_transform(combine_worship_g1$worship_geometry, st_crs(combine_worship_g1$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g1 <- combine_worship_g1 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 2 - blocks 1001 - 2000  
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g2 <- expand_grid(sf_cent_trial_g2, worship_amenities)
+
+if (st_crs(combine_worship_g2$geometry) != st_crs(combine_worship_g2$worship_geometry)) {
+  combine_worship_g2$worship_geometry <- st_transform(combine_worship_g2$worship_geometry, st_crs(combine_worship_g2$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g2 <- combine_worship_g2 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 3 - blocks 2001 - 3000 
+
+library(tidyr)
+
+## Combining the data for this public service
+combine_worship_g3 <- expand_grid(sf_cent_trial_g3, worship_amenities)
+
+if (st_crs(combine_worship_g3$geometry) != st_crs(combine_worship_g3$worship_geometry)) {
+  combine_worship_g3$worship_geometry <- st_transform(combine_worship_g3$worship_geometry, st_crs(combine_worship_g3$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g3 <- combine_worship_g3 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 4 - blocks 3001 - 4000 
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g4 <- expand_grid(sf_cent_trial_g4, worship_amenities)
+
+if (st_crs(combine_worship_g4$geometry) != st_crs(combine_worship_g4$worship_geometry)) {
+  combine_worship_g4$worship_geometry <- st_transform(combine_worship_g4$worship_geometry, st_crs(combine_worship_g4$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g4 <- combine_worship_g4 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 5 - blocks 4001 - 5000 
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g5 <- expand_grid(sf_cent_trial_g5, worship_amenities)
+
+if (st_crs(combine_worship_g5$geometry) != st_crs(combine_worship_g5$worship_geometry)) {
+  combine_worship_g5$worship_geometry <- st_transform(combine_worship_g5$worship_geometry, st_crs(combine_worship_g5$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g5 <- combine_worship_g5 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 6 - blocks 5001 - 6000 
+
+library(tidyr)
+combine_worship_g6 <- expand_grid(sf_cent_trial_g6, worship_amenities)
+
+if (st_crs(combine_worship_g6$geometry) != st_crs(combine_worship_g6$worship_geometry)) {
+  combine_worship_g6$worship_geometry <- st_transform(combine_worship_g6$worship_geometry, st_crs(combine_worship_g6$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g6 <- combine_worship_g6 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 7 - blocks 6001 - 7000 
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g7 <- expand_grid(sf_cent_trial_g7, worship_amenities)
+
+if (st_crs(combine_worship_g7$geometry) != st_crs(combine_worship_g7$worship_geometry)) {
+  combine_worship_g7$worship_geometry <- st_transform(combine_worship_g7$worship_geometry, st_crs(combine_worship_g7$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g7 <- combine_worship_g7 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 8 - blocks 7001 - 8000 
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g8 <- expand_grid(sf_cent_trial_g8, worship_amenities)
+
+if (st_crs(combine_worship_g8$geometry) != st_crs(combine_worship_g8$worship_geometry)) {
+  combine_worship_g8$worship_geometry <- st_transform(combine_worship_g8$worship_geometry, st_crs(combine_worship_g8$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g8 <- combine_worship_g8 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 9 - blocks 8001 - 9000 
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g9 <- expand_grid(sf_cent_trial_g9, worship_amenities)
+
+if (st_crs(combine_worship_g9$geometry) != st_crs(combine_worship_g9$worship_geometry)) {
+  combine_worship_g9$worship_geometry <- st_transform(combine_worship_g9$worship_geometry, st_crs(combine_worship_g9$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g9 <- combine_worship_g9 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+### Calculating for each 1000 blocks at a time 
+  # group 10 - blocks 9001 - 10501
+
+library(tidyr)
+## Combining the data for this public service
+combine_worship_g10 <- expand_grid(sf_cent_trial_g10, worship_amenities)
+
+if (st_crs(combine_worship_g10$geometry) != st_crs(combine_worship_g10$worship_geometry)) {
+  combine_worship_g10$worship_geometry <- st_transform(combine_worship_g10$worship_geometry, st_crs(combine_worship_g10$geometry))
+}
+
+## Calculating the distance (assuming Euclidean distance)
+min_distances_worship_g10 <- combine_worship_g10 %>%
+  group_by(block_id) %>%
+  summarize(min_distance = min(st_distance(geometry, worship_geometry), na.rm = TRUE))
+
+```
+
+```{r}
+# Merging groups of places of worship distances to one dataset
+
+combined_data_worship <- bind_rows(min_distances_worship_g1, min_distances_worship_g2, min_distances_worship_g3, min_distances_worship_g4, min_distances_worship_g5, min_distances_worship_g6, min_distances_worship_g7, min_distances_worship_g8, min_distances_worship_g9, min_distances_worship_g10)
+
+# Creating a file with all this info
+write.csv(combined_data_worship, "medellin_worship_distances.csv", row.names = TRUE)
+```
+
+```{r}
+# Combining all amenities the combined datasets
+
+combined_data_school <- combined_data_school %>%
+  rename(min_distance_school = min_distance)
+
+combined_data_worship <- combined_data_worship %>%
+  rename(min_distance_worship = min_distance)
+
+
+combined_data_all_amenities <- combined_data_school %>%
+  left_join(combined_data_bus, by = "block_id") %>%
+    left_join(combined_data_fire, by = "block_id") %>%
+    left_join(combined_data_hospital, by = "block_id") %>%
+    left_join(combined_data_police, by = "block_id") %>%
+      left_join(combined_data_worship, by = "block_id")
+
+###### Creating and exporting the final dataset (without geometry)
+
+sf_cent_withoutgeometry <- sf_cent %>%
+  select(-geometry)
+
+final_dataframe <- sf_cent %>%
+  left_join(combined_data_all_amenities, by = "block_id") 
+
+
+
+final_dataframe3 <- final_dataframe %>%
+  select(COD_MPIO, ipm, block_id, min_distance_school, min_distance_bus, min_distance_fire, min_distance_hospital, min_distance_police, min_distance_worship)
+
+
+# Creating a file with all this info
+write.csv(final_dataframe, "medellin_dataframe.csv", row.names = TRUE)
+
+saveRDS(final_dataframe, "C:/Users/duana/OneDrive/McCourt_MIDP/Sem2/IntroDataScience/Final_Proj/Final_Proj/Final_Project.rds")
+
+###### Creating and exporting the final dataset (shapefile)
+
+med_sf <- med_sf %>%
+    mutate(block_id = row_number())
+```
+
+```{r}
+
+# Estimating the models:
+## 1.General recommendations about the machine learning models.
+
+# Show results:
+## 1. Recommendations on how to show the results at the end.
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
