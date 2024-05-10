@@ -19,10 +19,21 @@ Quarto enables you to weave together content and executable code into a finished
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this
 
 ## Data Wrangling
+To create the final data frame, we collected data from different sources, as described in the previous session. Our main goal was to have a dataset for Medellín blocks with the closest distance from different public services. We worked to create a data frame where each Meddelín block was one row, and the distances from the closest public service (referred to as an amenity) were columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship.  Hence, the goal was to have, for each block, one column for each category of amenity, with the distance from the closest one. 
 
-```{r}
+We tried different approaches to address this goal, including creating a loop, calculating all distances separately, using "data.table", etc. However, some approaches did not work, passing the software's maximum capacity. After multiple trials and searches, we figured out a solution, which is described below. 
 
-```
+To address this goal, we first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps per amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block. 
+
+We generated block IDs for each block and divided the calculation into groups for amenities categories with a larger number of units to facilitate the code's running. For these categories we merged the groups after calculating them. 
+
+After these steps, we had one data frame for each amenity distance calculation. We then combined all the datasets using the left_join command. 
+
+Finally, we saved the final dataset with only the needed columns and downloaded the data frame separately. The objective of having this data separately created is to be used in the next part of this project without the necessity to run this distance calculation code again. This qmd became heavy with all the calculations, taking more than 40 minutes to run on average.
+
+There was no missing data or need to be cleaned out. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues. 
+
+The code is available on "data_wrangling_medellin.qmd". We kept it separately aiming for the best performance on this qmd. 
 
 ## Data Analysis: Predicting Models
 
