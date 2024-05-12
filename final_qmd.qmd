@@ -12,31 +12,20 @@ format:
 
 ## Background and Literature Review
 
-We aim to study how to estimate the multidimensional poverty index (MPI) using spatial data at the street block level. In this attempt, we tried to replicate the paper "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz. We do so by using concepts that we have learnt in class. Therefore, it is a partial replication.
+we aim to predict Multidimensional Poverty Index (MPI) at a block level in the city of Medellin, using Geospatial data. In this attempt, we tried to replicate the paper "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz.
 
-Many economists, e.g., Prof. Amartya Sen, have pointed out that poverty is not just an income-based concept. They have done this through multiple approaches, like the human development income and capability approach (Muñetón-Santa and Manrique-Ruiz 2023). The shift in calculating poverty has moved beyond income and has incorporated health education and infrastructure. The multidimensional poverty index captures all these areas very well. While also including life with dignity as an important factor. 
+Specifically, in this project we will train two classes of machine learning models. In the first part we will attempt a regression analysis to try to predict the level of deprivations at the block level. In the second part, we will attempt classification models to try to predict the blocks that are poor or not poor according to the threshold of 33% as we will explained in later parts of this document.
 
-However, calculating MPIs can be heavily based on census data. Census data is calculated every ten years and is a costly affair (Muñetón-Santa and Manrique-Ruiz 2023). The government requires MPI data to analyze the country's development status and use this data to establish targets and solutions. The paper referenced here has done a fantastic job of using spatial data at the street block level to estimate MPIs. We think of it as a good practice because it will not just lower the cost of calculating the MPIs but also help us understand the role these services play in impacting poverty and living standards on the individuals and might simultaneously provide the government with a prospective solution.
+Many economists, e.g., Prof. Amartya Sen, have pointed out that poverty is not just an income-based concept. They have done this through multiple approaches, like the human development income and capability approach (Muñetón-Santa and Manrique-Ruiz, 2023). The shift in calculating poverty has moved beyond income and has incorporated components like health, education, and infrastructure that are crucial for a life with dignity.
 
-### Literature Review:
+However, calculating the MPI can be heavily based on census data that generally is calculated every ten years and is a costly affair (Muñetón-Santa and Manrique-Ruiz, 2023). Measuring poverty and having the capacity to target the poor is critical for effective policy design and implementation. In this sense, "a low-cost method for estimating multidimensional poverty is a crucial tool for qualifying public policy decision-making" (Muñetón-Santa and Manrique-Ruiz, 2023). Moreover, it can help us understand the role these services play in impacting poverty and living standards on individuals and might simultaneously provide governments with a prospective solutions.
 
-How to Build a National Multidimensional Poverty Index (MPI): Using the MPI to inform the SDGs paper authored by the United Nations Development Programme (UNDP) and Oxford Poverty and Human Development Initiative (OPHI) in their paper explains MPI and its construction. In the past, there has been a global shift away from calculating poverty based on lack of access to money. An individual can be malnourished and have a lack of access to clean water or health facilities (UNDP and OPHI, How to Build a National Multidimensional Poverty Index (MPI): Using the MPI to inform the SDGs 2019). The MPI acknowledges the lack of access to basic facilities and considers life with dignity to be an important factor. 
+The Multidimensional Poverty Index (MPI) is a measure developed by the United Nations Development Programme (UNDP) and the Oxford Poverty and Human Development Initiative (OPHI) to assess acute multidimensional poverty. Unlike traditional poverty measures that focus solely on income, the MPI considers deprivations across three dimensions: health, education, and standard of living. It is built using 10 indicators spanning these three dimensions, each with equal weighting.
 
-According to the paper UNDP and OPHI, Multidimensional Poverty and the AF method n.d., we are going to explain the calculation for MPI utilizing the AF (Alkire-Foster) method. AF method satisfies most of the requirements focusing on life with dignity. The AF method uses and generates three key statistics:
+To construct the MPI, each person is assigned a deprivation score based on the specific deprivations they face across the 10 indicators. These individual deprivation scores are then weighted and summed to produce a household deprivation score. A household is identified as multidimensionally poor if its deprivation score exceeds the poverty cutoff of 33.3%. This cutoff means that a person is considered multidimensionally poor if they are deprived in at least one-third of the weighted indicators.
 
-1\. Incidence (H): It is the headcount ratio of the poor in the area. 
+The MPI itself is calculated as the product of two measures: the incidence of poverty (H), which is the proportion of people identified as multidimensionally poor, and the intensity of poverty (A), which is the average deprivation score of the poor. By capturing deprivations across multiple dimensions, the MPI provides a more comprehensive understanding of poverty beyond just income levels, enabling targeted policies and interventions to address specific areas of deprivation.
 
-2\. Intensity (A): It is the deprivation score among poor people. It is the weighted average of the indicators that are deprived to the poor.
-
-3\. MPI: The MPI is calculated by multiplying H and A. It represents the share of deprivation that the poor face. It ranges from 0 to 1, where 0 = no poverty and 1 = universal poverty. 
-
-In our project, we use MPI in percentage values. Therefore, 0 to 100. The threshold for poverty is 33 per cent. 
-
-As for our methodology, we are following Muñetón-Santa and Manrique-Ruiz (2023).  
-
-(source: Muñetón-Santa and Manrique-Ruiz (2023))
-
-However, in machine learning we are doing our own analysis and not following the one the paper suggests. We are also not using ESA's land use cover.
 
 ### Bibliography
 
@@ -46,43 +35,474 @@ UNDP, and OPHI. 2019. *How to Build a National Multidimensional Poverty Index (M
 
 ---. n.d. *Multidimensional Poverty and the AF method .* Accessed May Friday, 2024. https://ophi.org.uk/md-poverty-and-AF-method.
 
+```{r}
+#Uploading necessary libraries
+library(tidyverse)
+library(tidymodels)
+library(ranger)
+library(sf)
+library(patchwork)
+library(osmdata)
+```
+
+
 ## Data Sources
 
-We used multiple datasets for our project. To get the MPI values, we use the dataset by the National Department of Statistics (DANE by the Spanish acronym) for the year 2018. The data for MPI in the dataset is calculated at the block level. Each block is defined by the administrative department with its identifiers (Muñetón-Santa and Manrique-Ruiz 2023). As discussed above, the MPI calculation follows the AF method. This data is available at: https://geoportal.dane.gov.co/visipm/. The MPI in this data set will be used as the outcome of interest in our analysis. 
+We will use the Multidimensional Poverty Index (MPI) calculated at the street block level for the city of Medellin from the National Department of Statistics of Colombia, available in: https://geoportal.dane.gov.co/visipm/. The MPI in this data set will be used as the outcome of interest in our analysis.
 
-For spatial data, we access the Open Street Map available from Planet OSM. We got the spatial data and using it calculated the nearest distance from the decided facility, which are, police stations, hospitals, schools, universities, churches, airports, banks, and bus stops. This information can be downloaded from Open Street Map using the library(osmdata). The information about this open-source portal can be found here: 
+```{r}
+col_sf <- read_sf("data/VULNRB_IPMxMZ.shp")
 
--- https://www.openstreetmap.org/about
+head(col_sf)
 
--- https://www.openstreetmap.org/#map=12/10.8738/-74.9280 
+#Filtering the information for Medellin, and drop variables that we don't need.
+med_sf <- col_sf %>%
+  filter(COD_MPIO == "05001", ipm !=0, ipm != 100, !is.na(ipm) )%>%
+  select(COD_MPIO, ipm, geometry)
 
-The codes which we used are mentioned below:
+med_sf <- med_sf %>%
+  mutate(block_id = row_number())
+```
+
+
+As explanatory variables we will attempt to use the distance from each block to public infrastructure in the city. This information is downloaded from Open Street Map using the library(osmdata). 
+
+```{r}
+med_sf <- med_sf %>%
+  st_transform(crs = 4326)
+
+head(med_sf)
+bbox1 <- st_bbox(med_sf)
+
+infrastructure <- opq(bbox = bbox1)%>%
+  add_osm_features(features = list("amenity" = "school",
+                                   "amenity" = "police",
+                                   "amenity" = "fire_station",
+                                   "amenity" = "bus_station",
+                                   "amenity" = "hospital",
+                                   "amenity" = "place_of_worship")) %>%
+                     osmdata_sf()
+
+#Create the dataframe with the geometry information
+infrastructure_points <- bind_rows(
+  pluck(infrastructure, "osm_points"),
+  st_centroid(pluck(infrastructure, "osm_polygons"))
+)
+
+inf_points_clean <- infrastructure_points %>%
+  filter(!is.na(name))%>%
+  select(osm_id, name, amenity, geometry)
+```
+
+The following map shows how the MPI dataset and the infrastrcuture points look like:
+
+
+```{r}
+inf_points_clean$amenity_factor <- as.factor(inf_points_clean$amenity)
+
+ggplot() +
+  geom_sf(data = med_sf, aes(fill = ipm), color = "white", size = 0.1) +
+  scale_fill_gradient(low = "#cfe8f3", high = "#062635") +
+  geom_sf(data = inf_points_clean, aes(color = amenity_factor), size = 1, alpha = 0.7) +
+  scale_color_manual(values = c(
+    school = "blue",
+    place_of_worship = "red",
+    hospital = "green",
+    police = "yellow",
+    fire_station = "purple",
+    bus_station = "hotpink"
+  )) +
+  theme_void()
+```
+
+
+In the following section we describe the data wrangling process to obtain the final data set we need to run our machine learning models. The final data set will consist on the MPI per block and the nearest distance of each block to each of the infrastructure points.
 
 ## Data Wrangling
 
-To create the final data frame, we collected data from different sources, as described in the previous session. Our main goal was to have a dataset for Medellín blocks with the closest distance from different public services. We worked to create a data frame where each Meddelín block was one row, and the distances from the closest public service (referred to as an amenity) were columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship. Hence, the goal was to have, for each block, one column for each category of amenity, with the distance from the closest one.
+We worked to create a data set where each block in the city is one row, and the distances from the closest public service (referred to as an amenity) are the columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship. Hence, the goal was to have, for each block, one column for each category of amenity, with the distance to the closest one.
 
-We tried different approaches to address this goal, including creating a loop, calculating all distances separately, using "data.table", etc. However, some approaches did not work, passing the software's maximum capacity. After multiple trials and searches, we figured out a solution, which is described below.
+We tried different approaches to address this goal, including creating a loop, calculating all distances separately, and using "data.table". However, some approaches didn't work because it required too much computational power. After multiple trials we figured out a solution which is described below.
 
-To address this goal, we first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps per amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block.
+We first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps by amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block.
 
-We generated block IDs for each block and divided the calculation into groups for amenities categories with a larger number of units to facilitate the code's running. For these categories we merged the groups after calculating them.
+We generated block IDs for each block and divided the calculation into groups by amenity categories with a larger number of units to facilitate running the code. For these categories we merged the groups after calculating them.
 
-After these steps, we had one data frame for each amenity distance calculation. We then combined all the datasets using the left_join command.
+After these steps, we had one data frame for each amenity distance calculation. We then combined all the data sets using the left_join command.
 
-Finally, we saved the final dataset with only the needed columns and downloaded the data frame separately. The objective of having this data separately created is to be used in the next part of this project without the necessity to run this distance calculation code again. This qmd became heavy with all the calculations, taking more than 40 minutes to run on average.
+Finally, we saved the final data set with only the needed columns and downloaded it separately. The objective of having this data separately is to be used in the next part of this project without the necessity to run this distance calculation code again. These are computational intensive calculations taking over 40 minutes to run on average.
 
 There was no missing data or need to be cleaned out. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues.
 
-The code is available on "data_wrangling_medellin.qmd". We kept it separately aiming for the best performance on this qmd.
+The code is available on "data_wrangling_medellin.qmd" in the repository for this project. We kept it separately aiming for the best performance on this file.
+
+```{r}
+#Uploading the final version of the data set for analysis
+data_med <- read.csv("data/medellin_dataframe.csv")
+```
+
 
 ## Data Analysis: Predicting Models
 
 ### Supervised Machine Learning Models - Regression
 
+For this first part we aim to predict Multidimensional Poverty at a block level in the city of Medellin, using Geospatial data. Our supervised machine learning model will attempt to predict the level of MPI per block (our outcome of interest), using regression analysis, based on the distances of each block to all the nearest infrastructure items.
+
+In this case we will choose rmse as our error metric. Considering that people with a score of 33 or higher are poor, and rmse above a 1/3 of that value would be too much for the model to be useful.
+
+#### Set up and Exploratory analysis
+
+1)  In the box plot explaining the minimum distance from school, we witness that the not poor are closer to school than the poor. It shows that the not-poor median population is slightly closer to a school than the poor median population.
+
+2)  Interestingly, we see that in the second box plot, the poor population are closer to bus stops than not poor population. The median population of poor is slightly closer to bus stops than the median population of not poor.
+
+3)  In the third box plot, we witness a stark difference in the closeness from the minimum distance to the fire station between poor and non-poor populations. The poor median population is farther away from fire stations than the not poor median population.
+
+4)  The box plot explaining the relation between the population with minimum distance from the hospital shows that the distance is almost equal between the two median populations.
+
+5)  In the fifth box plot, we focus on the minimum distance between police stations. Quite interestingly, we see that minimum distance in general is very low for not poor population, unlike the poor population. To point out further, we see no outliers in the distribution of the poor population.
+
+6)  The sixth box plot shows the minimum distance from the place of worship. It is almost similar for the two populations in our analysis. To add to it, the minimum distance is quite low for the two median populations.
+
 ```{r}
+set.seed(456)
+
+# Create a sample for predictive modelling
+mpi_split <- initial_split(data_med)
+
+mpi_train <- training(x = mpi_split)
+mpi_test <- testing(x = mpi_split)
+
+#EDA on training data
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_school))+
+  geom_boxplot()+
+  theme_minimal()
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_bus))+
+  geom_boxplot()+
+  theme_minimal()
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_fire))+
+  geom_boxplot()+
+  theme_minimal()
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_hospital))+
+  geom_boxplot()+
+  theme_minimal()
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_police))+
+  geom_boxplot()+
+  theme_minimal()
+
+data_med %>%
+  mutate(poor = case_when(
+    ipm >= 33 ~ "Poor",
+    ipm < 33 ~ "Not Poor",
+    TRUE ~ NA
+  )) %>%
+  ggplot(aes(factor(poor), min_distance_worship))+
+  geom_boxplot()+
+  theme_minimal()
+
 
 ```
+#### Training and selecting the best model
+
+```{r}
+#Resampling
+set.seed(10624)
+
+folds <- vfold_cv(mpi_train, v = 10)
+```
+
+```{r}
+# Specifications
+
+#linear reg specification
+lm_spec <- linear_reg()%>%
+  set_engine("lm") %>%
+  set_mode("regression")
+
+#KNN specification
+knn_spec <- nearest_neighbor(neighbors = tune()) %>%
+  set_engine(engine = "kknn") %>%
+  set_mode(mode = "regression")
+
+#Random forest specification
+
+rf_spec <- rand_forest(
+  trees = 1000,
+  min_n = 10) %>%
+  set_mode("regression")%>%
+  set_engine("ranger")
+```
+
+```{r}
+# Recipes
+
+#Linear regression recipe
+
+lm_rec <- recipe(ipm ~ ., mpi_train)%>%
+  step_rm(block_id)%>%
+  step_zv(all_predictors())%>%
+  step_impute_linear(all_predictors())%>%
+  step_corr(all_predictors())
+
+#knn recipe
+
+knn_rec <- recipe(ipm ~ ., mpi_train)%>%
+  step_rm(block_id)%>%
+  step_zv(all_predictors())%>%
+  step_normalize(all_predictors())
+
+#Rand forest recipe
+
+general_rec <- recipe(ipm ~ ., mpi_train)%>%
+  step_rm(block_id)
+```
+
+```{r}
+##Workflows
+
+lm_workflow <- workflow() %>%
+  add_recipe(lm_rec)%>%
+  add_model(lm_spec)
+
+knn_workflow <- workflow() %>%
+  add_recipe(knn_rec)%>%
+  add_model(knn_spec)
+
+rf_workflow <- workflow() %>%
+  add_recipe(general_rec)%>%
+  add_model(rf_spec)
+```
+
+To collect the metrics we used the optimal paramenters from KNN, i.e., 15 neighbours.
+
+```{r}
+##Fiting and hyperparameter tuning
+
+#Fitting regression model using v-fold re sampling method
+lm_fit_rs <- lm_workflow %>%
+  fit_resamples(resamples = folds,
+                control = control_resamples(save_pred = TRUE),
+                metrics = metric_set(rmse, rsq))
+
+#Fiting and tuning knn
+knn_grid <- grid_regular(neighbors(range = c(1, 15)), levels = 10)
+
+knn_res <- knn_workflow %>% 
+  tune_grid(resamples = folds, 
+            grid = knn_grid,
+            control = control_grid(save_pred = TRUE),
+            metrics = metric_set(rmse, rsq))
+
+knn_best <- knn_res %>%
+  select_best(metric = "rmse") #15 neighbors
+
+###Fiting again###
+knn_spec_tune <- nearest_neighbor(neighbors = 15) %>%
+  set_engine(engine = "kknn") %>%
+  set_mode(mode = "regression")
+  
+knn_tune_workflow <- workflow() %>%
+  add_recipe(knn_rec)%>%
+  add_model(knn_spec_tune)
+
+knn_fit_tune_rs <- knn_tune_workflow %>%
+  fit_resamples(resamples = folds,
+                control = control_resamples(save_pred = TRUE),
+                metrics = metric_set(rmse, rsq))
+
+#Fiting random forest
+rf_fit_rs <- rf_workflow %>%
+  fit_resamples(resamples = folds,
+                control = control_resamples(save_pred = TRUE),
+                metrics = metric_set(rmse, rsq))
+```
+
+We select the KNN as the best model based on rmse. In the linear regression model we see that rmse's mean is 13.93781553 and the standard error is 0.110941174. In the KNN model the rmse mean value is 11.2959111 and the standard error is 0.13778253. In the random forest model, the mean value for rmse is 11.3970902 and the standard error is 0.14735739.
+
+```{r}
+###Collecting metrics###
+lm_metrics <- collect_metrics(lm_fit_rs)
+print(lm_metrics)
+
+knn_metrics <- collect_metrics(knn_fit_tune_rs) 
+print(knn_metrics)
+
+rf_metrics <- collect_metrics(rf_fit_rs) 
+print(rf_metrics)
+```
+
+From here we proceed with the KNN model to finalize the prediction.
+
+#### Final fitting and prediction
+
+Calculating out-of-sample rsme: 11.51339. This is a little under the threshold we set for a useful model. In that sense, we will need to go back to the models and try to improve their predicted power or even look at the data available and complement it with additional information to help the models.
+
+```{r}
+knn_final <- finalize_workflow(knn_workflow,
+                               parameters = knn_best)
+
+knn_final_fit <-knn_final %>%
+  fit(data = mpi_train) 
+
+knn_predictions <- knn_final_fit%>%
+  predict(new_data = mpi_test)
+
+knn_rmse_final <- bind_cols(
+  mpi_test %>% select(ipm),
+  knn_predictions %>% select(.pred)) %>%
+  rmse(truth = ipm, estimate = .pred)
+
+knn_rmse_final
+```
+
+Implementation of the final model
+
+```{r}
+mpi_implement_predict <- knn_final_fit %>% 
+  predict(data_med)
+
+mpi_implement_predict_final <- bind_cols(
+  data_med, 
+  mpi_implement_predict %>% select(.pred)) 
+
+head(mpi_implement_predict_final)
+```
+
+#### Results
+
+To analyze the results we will look at the original dataset of MPI per block of Medellin that contains the shape files to understand visually how our model performed in comparison to the real values. We also need to bind the predicted MPI to the original Medellin data set to make a visual comparisons.
+
+```{r}
+med_comparison <- bind_cols(
+  med_sf, 
+  mpi_implement_predict %>% select(.pred)) 
+
+#calculating the absolute difference between predicted and actual MPI.
+med_comparison2 <- med_comparison %>%
+  mutate(diff_pmi = abs(ipm - .pred))
+
+head(med_comparison2)
+```
+
+We plot a map of Medellin with the actual MPI per block and another with the predicted MPI. We have to remember that an MPI of 33 or above is considered poor, and the higher it goes the higher the severity of poverty. In that sense, the more intense the color of the block, the poorer they are in MPI measure.
+
+```{r}
+# Calculate the overall range for both variables
+overall_range <- range(c(med_comparison2$ipm, med_comparison2$.pred))
+
+# Define breaks for the color scale
+breaks <- seq(ceiling(overall_range[1]), floor(overall_range[2]), length.out = 5)
+
+# Plot 1: Contour Map for ipm variable
+ggplot(med_comparison2) +
+  geom_sf(aes(fill = ipm), color = "white", size = 0.1) +
+  scale_fill_gradient(
+    low = "#FFEDA0",  # Light yellow
+    high = "#E31A1C", # Red
+    limits = overall_range,  # Set the limits to ensure consistency
+    breaks = breaks,
+    guide = guide_colorbar(title = "MPI")) +
+  labs(title = "Actual MPI By Block Level In The City Of Medellin") +
+  theme_void()
+
+# Plot 2: Contour Map for .pred variable
+ggplot(med_comparison2) +
+  geom_sf(aes(fill = .pred), color = "white", size = 0.1) +
+  scale_fill_gradient(
+    low = "#FFEDA0",  # Light yellow
+    high = "#E31A1C", # Red
+    limits = overall_range,  # Set the limits to ensure consistency
+    breaks = breaks,
+    guide = guide_colorbar(title = "MPI")) +
+  labs(title = "Predicted MPI By Block Level In The City Of Medellin") +
+  theme_void()
+
+
+
+
+```
+
+We also calculated the absolute difference on MPIs between the actual values and the predicted ones. In this case, those blocs closer to a blue color have the biggest difference, meaning they have the highest error in prediction. In contrast, the blocks closer to yellow have a lower error in the prediction.
+
+```{r}
+# Difference in actual and predicted MPI
+ggplot() +
+  geom_sf(
+    data = med_comparison2, 
+    aes(fill = diff_pmi), 
+    color = "white", 
+    size = 0.1
+  ) +
+  scale_fill_gradient(
+    low = "#FFEDA0", 
+    high = "#2C7BB6",
+    guide = guide_colorbar(title = "Difference in MPI")
+  ) +
+  labs(
+    title = "Difference In Actual And Predicted MPI By Block Level In The City Of Medellin"
+  ) +
+  theme_void()
+
+```
+
+Finally, we wanted to understand the distribution of the errors in our predictions to understand how far away they are form the actual values. We can see how the bulk of the differences are between 1 and 6 points in absolute terms. That means that, the majority of the errors in our predictions are values that are between 1 and 6 points higher or lower than the actual value. 
+```{r}
+# histogram
+
+# Calculate the range of the diff_pmi variable
+diff_pmi_range <- range(med_comparison2$diff_pmi)
+
+# Define breaks with fewer intervals
+custom_breaks <- seq(ceiling(diff_pmi_range[1]), floor(diff_pmi_range[2]), by = 5)
+
+histogram <- ggplot(med_comparison2, aes(x = diff_pmi)) +
+  geom_histogram(binwidth = 1, fill = "#2C7BB6", color = "white") +
+  labs(
+    x = "Absolute Difference in MPI",
+    y = "Frequency",
+    title = "Histogram of Difference in MPI"
+  ) +
+  scale_x_continuous(breaks = custom_breaks) +
+  theme_minimal()
+
+histogram
+```
+
 
 ### Supervised Machine Learning Models - Classification
 
@@ -90,6 +510,3 @@ The code is available on "data_wrangling_medellin.qmd". We kept it separately ai
 
 ```
 
-## Discussion of Results
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
