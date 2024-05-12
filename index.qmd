@@ -12,7 +12,7 @@ format:
 
 ## Background and Literature Review
 
-we aim to predict Multidimensional Poverty Index (MPI) at a block level in the city of Medellin, using Geospatial data. In this attempt, we tried to replicate the paper "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz.
+We aim to predict Multidimensional Poverty Index (MPI) at a block level in the city of Medellin using Geospatial data. In this attempt, we tried to replicate the paper "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data" by Guberney Muñetón-Santa and Luis Carlos Manrique-Ruiz.
 
 Specifically, in this project we will train two classes of machine learning models. In the first part we will attempt a regression analysis to try to predict the level of deprivations at the block level. In the second part, we will attempt classification models to try to predict the blocks that are poor or not poor according to the threshold of 33% as we will explained in later parts of this document.
 
@@ -25,7 +25,6 @@ The Multidimensional Poverty Index (MPI) is a measure developed by the United Na
 To construct the MPI, each person is assigned a deprivation score based on the specific deprivations they face across the 10 indicators. These individual deprivation scores are then weighted and summed to produce a household deprivation score. A household is identified as multidimensionally poor if its deprivation score exceeds the poverty cutoff of 33.3%. This cutoff means that a person is considered multidimensionally poor if they are deprived in at least one-third of the weighted indicators.
 
 The MPI itself is calculated as the product of two measures: the incidence of poverty (H), which is the proportion of people identified as multidimensionally poor, and the intensity of poverty (A), which is the average deprivation score of the poor. By capturing deprivations across multiple dimensions, the MPI provides a more comprehensive understanding of poverty beyond just income levels, enabling targeted policies and interventions to address specific areas of deprivation.
-
 
 ### Bibliography
 
@@ -43,12 +42,13 @@ library(ranger)
 library(sf)
 library(patchwork)
 library(osmdata)
+library(gridExtra)
+library(themis)
 ```
-
 
 ## Data Sources
 
-We will use the Multidimensional Poverty Index (MPI) calculated at the street block level for the city of Medellin from the National Department of Statistics of Colombia, available in: https://geoportal.dane.gov.co/visipm/. The MPI in this data set will be used as the outcome of interest in our analysis.
+We will use the Multidimensional Poverty Index (MPI) calculated at the street block level for the city of Medellin from the National Department of Statistics of Colombia (DANE), available in: https://geoportal.dane.gov.co/visipm/. The MPI in this data set will be used as the outcome of interest in our analysis.
 
 ```{r}
 col_sf <- read_sf("data/VULNRB_IPMxMZ.shp")
@@ -64,8 +64,7 @@ med_sf <- med_sf %>%
   mutate(block_id = row_number())
 ```
 
-
-As explanatory variables we will attempt to use the distance from each block to public infrastructure in the city. This information is downloaded from Open Street Map using the library(osmdata). 
+As explanatory variables we will attempt to use the distance from each block to public infrastructure in the city. This information is downloaded from Open Street Map (OSM) using the library(osmdata).
 
 ```{r}
 med_sf <- med_sf %>%
@@ -96,7 +95,6 @@ inf_points_clean <- infrastructure_points %>%
 
 The following map shows how the MPI dataset and the infrastrcuture points look like:
 
-
 ```{r}
 inf_points_clean$amenity_factor <- as.factor(inf_points_clean$amenity)
 
@@ -112,35 +110,35 @@ ggplot() +
     fire_station = "purple",
     bus_station = "hotpink"
   )) +
+  labs(title = "Map of Multidimensional Poverty Index and City Amenities, by City Block in Medellin",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_void()
 ```
-
 
 In the following section we describe the data wrangling process to obtain the final data set we need to run our machine learning models. The final data set will consist on the MPI per block and the nearest distance of each block to each of the infrastructure points.
 
 ## Data Wrangling
 
-We worked to create a data set where each block in the city is one row, and the distances from the closest public service (referred to as an amenity) are the columns. The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship. Hence, the goal was to have, for each block, one column for each category of amenity, with the distance to the closest one.
+In order to conduct the described analysis, we needed to combine the two data sets from DANE and OSM. We worked to create a data set where each block in the city is one row (pulled from the DANE dataset), and the distances from the closest public service (referred to as an amenity) are the columns (calculated using both the DANE and OSM datasets). The amenities categories used are schools, hospitals, police stations, fire stations, bus stops, and places of worship. Hence, the goal was to have, for each block, one column for each category of amenity, with the distance to the closest one.
 
 We tried different approaches to address this goal, including creating a loop, calculating all distances separately, and using "data.table". However, some approaches didn't work because it required too much computational power. After multiple trials we figured out a solution which is described below.
 
-We first calculated the centroid of each block as the reference point to the distance calculation. We organized the next steps by amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block.
+We first calculated the centroid of each block as the reference point to the distance calculation using the dataset from the DANE. We organized the next steps by amenity category. For each category, we calculated the distance from each of the amenities to each one of the blocks. Without saving all the calculations, we searched for the smaller distance among the ones calculated. We saved only the smaller distance, representing the closest amenity from each block.
 
 We generated block IDs for each block and divided the calculation into groups by amenity categories with a larger number of units to facilitate running the code. For these categories we merged the groups after calculating them.
 
 After these steps, we had one data frame for each amenity distance calculation. We then combined all the data sets using the left_join command.
 
-Finally, we saved the final data set with only the needed columns and downloaded it separately. The objective of having this data separately is to be used in the next part of this project without the necessity to run this distance calculation code again. These are computational intensive calculations taking over 40 minutes to run on average.
+Finally, we saved the final data set with only the needed columns and downloaded it separately. The objective of having this final data set saved separately was to ensure that it could be used for the next part of theproject without having to run the time-consuming wrangling code again. These are computational intensive calculations taking over 40 minutes to run on average.
 
-There was no missing data or need to be cleaned out. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues.
+We also ran some initial calculations to ensure there was no missing data, or data that required cleaning from DANE. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues.
 
-The code is available on "data_wrangling_medellin.qmd" in the repository for this project. We kept it separately aiming for the best performance on this file.
+The full code is available on "data_wrangling_medellin.qmd" in the repository for this project. We kept it separate from this file to ensure the viewer could focus only on the analysis, aiming for the best performance on this file.
 
 ```{r}
 #Uploading the final version of the data set for analysis
 data_med <- read.csv("data/medellin_dataframe.csv")
 ```
-
 
 ## Data Analysis: Predicting Models
 
@@ -181,8 +179,10 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_school))+
+  ggplot(aes(factor(poor), min_distance_school, fill = factor(poor)))+
   geom_boxplot()+
+   labs(title = "Boxplot of Distance to School by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 data_med %>%
@@ -191,8 +191,10 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_bus))+
+  ggplot(aes(factor(poor), min_distance_bus, fill = factor(poor)))+
   geom_boxplot()+
+  labs(title = "Boxplot of Distance to Bus Stops by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 data_med %>%
@@ -201,8 +203,10 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_fire))+
+  ggplot(aes(factor(poor), min_distance_fire, fill = factor(poor)))+
   geom_boxplot()+
+  labs(title = "Boxplot of Distance to Fire Stations by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 data_med %>%
@@ -211,8 +215,10 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_hospital))+
+  ggplot(aes(factor(poor), min_distance_hospital, fill = factor(poor)))+
   geom_boxplot()+
+  labs(title = "Boxplot of Distance to Hospitals by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 data_med %>%
@@ -221,8 +227,10 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_police))+
+  ggplot(aes(factor(poor), min_distance_police, fill = factor(poor)))+
   geom_boxplot()+
+  labs(title = "Boxplot of Distance to Police Stations by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 data_med %>%
@@ -231,12 +239,15 @@ data_med %>%
     ipm < 33 ~ "Not Poor",
     TRUE ~ NA
   )) %>%
-  ggplot(aes(factor(poor), min_distance_worship))+
+  ggplot(aes(factor(poor), min_distance_worship, fill = factor(poor)))+
   geom_boxplot()+
+  labs(title = "Boxplot of Distance to Churches by Poverty Status",
+       caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_minimal()
 
 
 ```
+
 #### Training and selecting the best model
 
 ```{r}
@@ -437,7 +448,7 @@ ggplot(med_comparison2) +
     limits = overall_range,  # Set the limits to ensure consistency
     breaks = breaks,
     guide = guide_colorbar(title = "MPI")) +
-  labs(title = "Actual MPI By Block Level In The City Of Medellin") +
+  labs(title = "Actual MPI By Block Level In The City Of Medellin",  caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_void()
 
 # Plot 2: Contour Map for .pred variable
@@ -449,7 +460,7 @@ ggplot(med_comparison2) +
     limits = overall_range,  # Set the limits to ensure consistency
     breaks = breaks,
     guide = guide_colorbar(title = "MPI")) +
-  labs(title = "Predicted MPI By Block Level In The City Of Medellin") +
+  labs(title = "Predicted MPI By Block Level In The City Of Medellin",  caption = "Source: National Department of Statistics of Colombia & Open Street Maps") +
   theme_void()
 
 
@@ -474,13 +485,15 @@ ggplot() +
     guide = guide_colorbar(title = "Difference in MPI")
   ) +
   labs(
-    title = "Difference In Actual And Predicted MPI By Block Level In The City Of Medellin"
+    title = "Difference In Actual And Predicted MPI By Block Level In The City Of Medellin", 
+    caption = "Source: National Department of Statistics of Colombia & Open Street Maps"
   ) +
   theme_void()
 
 ```
 
-Finally, we wanted to understand the distribution of the errors in our predictions to understand how far away they are form the actual values. We can see how the bulk of the differences are between 1 and 6 points in absolute terms. That means that, the majority of the errors in our predictions are values that are between 1 and 6 points higher or lower than the actual value. 
+Finally, we wanted to understand the distribution of the errors in our predictions to understand how far away they are form the actual values. We can see how the bulk of the differences are between 1 and 6 points in absolute terms. That means that, the majority of the errors in our predictions are values that are between 1 and 6 points higher or lower than the actual value.
+
 ```{r}
 # histogram
 
@@ -503,10 +516,264 @@ histogram <- ggplot(med_comparison2, aes(x = diff_pmi)) +
 histogram
 ```
 
-
 ### Supervised Machine Learning Models - Classification
+
+For this first part we aim to predict Multidimensional Poverty at a block level in the city of Medellin, using Geospatial data. Our supervised machine learning model will do a binary classification to predict poverty status (either poor or non-poor) by block.
+
+We will do a classification model by creating a new variable that is either poor or not poor. Poor is classified when IPM \>=33 and not poor when IPM\<33. We will then run several models to predict whether each block is poor or not poor based on the distances to each of the amenities.
+
+We choose to use accuracy as our metric because we want to balance two things: 1) If we were using this model to tell us which blocks should receive some sort of social welfare program, it would be costly to classify a block that is actually poor as a non-poor block, as this would prevent those blocks from receiving assistance when they need it, and 2) at the same time, if we were using this for practical policy reasons, there would be a limited budget so we would need to ensure that we didn't label too many blocks that were non-poor as poor (and give benefits if they were not needed). If we wanted to ensure that every poor block was identified as poor in the model, we would just classify every block as poor (thereby giving us a sensitivity of 100%), but this has to be balanced with potential budget concerns, which is why we will use accuracy to choose the best model.
 
 ```{r}
 
+data_med <- data_med %>%
+  mutate(poor = ifelse(ipm >= 33, "poor", "not poor"))
+
+set.seed(20220412)
+
+med_split <- 
+  initial_split(data = data_med, prop = 0.8)
+
+med_train <- 
+  training(x= med_split)
+
+med_test <- 
+  testing(x=med_split)
+
+
 ```
 
+### Exploratory Data Analysis 
+
+```{r}
+
+ggplot(med_train, aes(x = ipm)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Multidimensional Poverty Index", x = "IPM", y = "Frequency", 
+       caption = "Source: National Department of Statistics of Colombia, available in:
+https://geoportal.dane.gov.co/visipm/ & Open Street Maps available in: https://www.openstreetmap.org/#map=12/10.8738/-74.9280") +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) + 
+  theme_minimal() +
+  theme(plot.caption = element_text(size = 6))
+
+ggplot(med_train, aes(x = factor(poor), y = ipm, fill = factor(poor))) +
+  geom_boxplot() +
+  labs(title = "Multidimensional Poverty Index by Poverty Status", x = "Poverty Status", y = "IPM", 
+       caption = "Source: National Department of Statistics of Colombia, available in:
+https://geoportal.dane.gov.co/visipm/ & Open Street Maps available in: https://www.openstreetmap.org/#map=12/10.8738/-74.9280") +
+   theme_minimal() + 
+  theme(plot.caption = element_text(size = 6))
+
+
+ggplot(med_train, aes(x = min_distance_school, y = ipm, color = factor(poor))) +
+  geom_point() +
+  labs(title = "Scatterplot of Multidimensional Poverty Index by Distance to School", x = "Distance to School", y = "IPM", color = "Poverty Status", 
+       caption = "Source: National Department of Statistics of Colombia, available in:
+https://geoportal.dane.gov.co/visipm/ & Open Street Maps available in: https://www.openstreetmap.org/#map=12/10.8738/-74.9280") +
+   theme_minimal() +
+  theme(plot.caption = element_text(size = 6))
+
+
+ggplot(med_train, aes(x = min_distance_fire, y = ipm, color = factor(poor))) +
+  geom_point() +
+  labs(title = "Scatterplot of Multidimensional Poverty Index by Distance to Fire Station", x = "Distance to Fire Station", y = "IPM", color = "Poverty Status", 
+       caption = "Source: National Department of Statistics of Colombia, available in:
+https://geoportal.dane.gov.co/visipm/ & Open Street Maps available in: https://www.openstreetmap.org/#map=12/10.8738/-74.9280") +
+   theme_minimal() +
+   theme(plot.caption = element_text(size = 6))
+
+
+```
+
+Using the first plot, we can see the distribution of IPM scores from 0 to 100. We see that the overall distribution is right tailed, with a significant portion of the blocks scoring below 20 and a decreasing number scoring above that. The second plot shows us the average scores once we make the distinction between poor and not poor using the IPM score of 33 as the threshold. We can see the overall average IPM score for the poor vs. the non-poor. We can see that the averages are relatively far apart in terms of IPM score, which we hope will make the model more successful (rather than scores all being clustered closer to 33, which would make the prediction harder.
+
+The next twp plots show the difference in distances between poor and not poor to schools and fire stations. We can see that the difference in distance to schools is very minimal, with the poor only slightly further away than the non poor (which can also be seen in the boxplots from the initial exploratory analysis). This difference is a bit larger for the fire stations, with the poor further away, though the confidence intervals are overlapping. The fact that both distances are relatively close together for the two groups means the predictive strength of our model may not be as good as we hoped.
+
+#### Training and selecting the best model
+
+```{r}
+# Model 1 - KNN
+
+class_folds <- vfold_cv(med_train, v = 10)
+
+
+med_knn_spec <- nearest_neighbor(weight_func = "rectangular", neighbors = tune()) %>%
+  set_engine("kknn") %>%
+  set_mode("classification") 
+
+med_knn_rec <- recipe(poor ~ ., data = med_train) %>%
+  step_rm(block_id, ipm) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+med_knn_workflow <- workflow() %>%
+  add_recipe(med_knn_rec) %>%
+  add_model(med_knn_spec)
+
+med_knn_grid <- grid_regular(neighbors(range = c(1, 15)), levels = 10)
+
+
+med_knn_res <- med_knn_workflow %>%
+  tune_grid(resamples = class_folds, 
+            control = control_grid(save_pred = TRUE),
+            metrics = metric_set(accuracy, sensitivity, specificity))
+
+med_knn_best <- select_best(med_knn_res, metric = "sensitivity")
+
+med_knn_best
+
+# The best parameter was 13 neighbors
+
+med_knn_spec_tune <- nearest_neighbor(neighbors = 13) %>%
+  set_engine(engine = "kknn") %>%
+  set_mode(mode = "regression")
+  
+med_knn_spec_tune <- nearest_neighbor(weight_func = "rectangular", neighbors = med_knn_best$neighbors) %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+med_knn_tune_workflow <- workflow() %>%
+  add_recipe(med_knn_rec) %>%
+  add_model(med_knn_spec_tune)
+
+med_knn_fit_tune_rs <- med_knn_tune_workflow %>%
+  fit_resamples(resamples = class_folds,
+                control = control_resamples(save_pred = TRUE),
+                metrics = metric_set(accuracy, sensitivity, specificity))
+
+med_knn_metrics <- collect_metrics(med_knn_fit_tune_rs) 
+print(med_knn_metrics)
+
+
+```
+
+Our KNN model results in an accuracy of 87.6% and sensitivity of 97.6% which would appear very good! However we anticipated that this would it is predicting many additional blocks as poor (which are nonpoor), so we just tested the specificity as well to see if this assumption is correct, just for illustrative purposes. Our assumption was correct, as the specificity is only 24.6%, which means that 75% of non-poor blocks are being categorized as poor. We will continue to use accuracy as the measure to ensure a balance between our two competing priorities.
+
+```{r}
+# Logistic model
+
+# Logistic regression model specification
+logistic_spec <- logistic_reg(mode = "classification") %>%
+  set_engine("glm")
+
+# Data preprocessing recipe
+logistic_rec <- recipe(poor ~ ., data = med_train) %>%
+  step_rm(block_id, ipm) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+# Create workflow
+logistic_workflow <- workflow() %>%
+  add_recipe(logistic_rec) %>%
+  add_model(logistic_spec)
+
+# Fit the model to each resample
+logistic_fit_resamples <- logistic_workflow %>%
+  fit_resamples(resamples = class_folds,
+                control = control_resamples(save_pred = TRUE),
+                metrics = metric_set(accuracy, specificity, sensitivity))
+
+# Collect and print the evaluation metrics
+logistic_metrics <- collect_metrics(logistic_fit_resamples) 
+print(logistic_metrics)
+```
+
+We can see that the logistic model produces a very high sensitivity at 99.3%, however the specificity is very bad at only 1.7%, which results in a lower accuracy than the KNN model at 86.0%. This means this model is probably predicting most blocks as "poor", which is why it is catching almost all of the poor blocks but also incorrectly labeling most non-poor blocks as poor. So while this in reality isn't actually a good model,
+
+```{r}
+# Decision tree
+
+# create a recipe
+med_rec <-
+  recipe(formula = poor ~., data = med_train) %>%
+  step_rm(block_id, ipm)
+
+# create a cart model object
+med_mod <- 
+  decision_tree() %>%
+  set_engine(engine = "rpart") %>%
+  set_mode(mode="classification")
+
+med_dt_workflow <- workflow() %>%
+  add_recipe(med_rec) %>%
+  add_model(med_mod)
+
+# fit the model
+med_fit <- med_dt_workflow %>%
+  fit(data = med_train)
+
+# create a tree
+rpart.plot::rpart.plot(x = med_fit$fit$fit$fit)
+```
+
+From the decision tree, we were unable to get the exact accuracy result, however we know that 2% predicted poor is far too low and this will not be a useful model compared to the other two.
+
+#### Final fitting and prediction
+
+```{r}
+med_knn_final <- finalize_workflow(med_knn_workflow, parameters = med_knn_best)
+
+med_knn_final_fit <- med_knn_final %>%
+  fit(data = med_train)
+
+med_knn_predictions <- med_knn_final_fit %>%
+  predict(new_data = med_test) %>%
+  bind_cols(med_test)
+
+# Convert the truth column to a factor
+med_knn_predictions$poor_factor <- factor(med_knn_predictions$poor)
+
+med_knn_accuracy_final <- med_knn_predictions %>%
+  yardstick::accuracy(truth = poor_factor, estimate = .pred_class)
+  
+med_knn_sensitivity_final <- med_knn_predictions %>%
+  yardstick::sensitivity(truth = poor_factor, estimate = .pred_class)
+
+med_knn_specificity_final <- med_knn_predictions %>%
+  yardstick::specificity(truth = poor_factor, estimate = .pred_class)
+
+med_knn_accuracy_final
+med_knn_sensitivity_final
+med_knn_specificity_final
+
+med_implement_predict <- med_knn_final_fit %>% 
+  predict(data_med)
+
+```
+
+#### Final Interpretation - Classification
+
+```{r}
+
+med_sf <- med_sf %>%
+  mutate(poor = ifelse(ipm >= 33, "poor", "not poor"))
+
+med_compare <- bind_cols(
+  med_sf, 
+  med_implement_predict)
+```
+
+```{r}
+# Creating a comparison of total number of poor blocks.
+actual_counts <- table(med_compare$poor)
+predicted_counts <- table(med_compare$.pred_class)
+
+plot_data <- data.frame(
+  variable = rep(c("Actual", "Predicted"), each = 2),
+  class = rep(c("poor", "not poor"), times = 2),
+  count = c(actual_counts, predicted_counts)
+)
+
+ggplot(plot_data, aes(x = variable, y = count, fill = class)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Class", y = "Count", fill = "Poverty Class") +
+  ggtitle("Comparison of Actual vs. Predicted Poverty Classes")
+```
+
+While the accuracy and sensitivity of our classification model appear at first glance to be acceptable, the overall strength of our model is not very good. Based on the fact that we have a very high specificity and an extremely low sensitivity, we know that the model is likely under-estimating the number of non-poor blocks (which we can see in the bar graph above). Overall the classification is not a very good model and would not be particularly valuable in the policy context, because our results are likely very similar to if we just predicted all blocks as poor.
+
+### Final Discussion of Results
+
+In testing the different models using both classification and regression methods, we can see the models both require improvement in order to be useful in a policy-making context. This type of machine learning model is extremely valuable, if it can successfully predict poverty, because poverty measures are very costly and time consuming to determine as they usually rely on census data (which is only collected every 10 years and is extremely expensive). This type of machine learning model could help provide a gap to measure poverty without having to wait for new census data, and to be more cost-effective. However, we have seen that both our classification and regression models do not have sufficient predictive power to make them a reliable alternative to the current methods.
+
+This suggests that we could take a few different approaches to strengthen the models in the future. One option would be to change the amenities used or to add additional amenities. We picked six amenities based on what the literature suggested would be most predictive, but this may have limited the predictive nature of the model by unintentionally leaving out other variables that may demonstrate greater differences between poor and non-poor blocks. We could use a combination of theory and testing to assess the predictive value of each of the relevant amenities to ensure they would help build a better model. We could also implement more powerful models with hyperparameter tuning.
