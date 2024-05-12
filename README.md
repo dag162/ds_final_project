@@ -23,8 +23,8 @@ We start with exploratory data analysis and continue with supervised machine lea
 
 ## Steps to replicate
 
-1. Clone this repository to your local machine (git clone on the Terminal), choosing a directory of your preference.
+1. Clone this repository to your local machine (git clone on the Terminal), choosing a directory of your preference: https://github.com/dag162/ds_final_project
 2. Make sure you have R and any necessary packages installed.
 3. Open the R.proj file in R Studio.
-4. Run the data wrangling code line by line or the entire script. Export the final data set to csv.
-5. Run the analysis code line by line or the entire script.
+4. Run the data wrangling code line by line or the entire script. Export the final data set to csv: https://github.com/dag162/ds_final_project/blob/main/data_wrangling_medellin.qmd
+5. Run the analysis code line by line or the entire script: https://github.com/dag162/ds_final_project/blob/main/index.qmd
