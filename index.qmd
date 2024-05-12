@@ -26,6 +26,8 @@ To construct the MPI, each person is assigned a deprivation score based on the s
 
 The MPI itself is calculated as the product of two measures: the incidence of poverty (H), which is the proportion of people identified as multidimensionally poor, and the intensity of poverty (A), which is the average deprivation score of the poor. By capturing deprivations across multiple dimensions, the MPI provides a more comprehensive understanding of poverty beyond just income levels, enabling targeted policies and interventions to address specific areas of deprivation.
 
+*You can access the full repository using the following link: <https://github.com/dag162/ds_final_project>*
+
 ### Bibliography
 
 Muñetón-Santa, Guberney, and Luis Carlos Manrique-Ruiz. 2023. "Predicting Multidimensional Poverty with Machine Learning Algorithms: An Open Data Source Approach Using Spatial Data." *Social Sciences* 1-21.
