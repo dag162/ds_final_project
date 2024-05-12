@@ -133,7 +133,7 @@ Finally, we saved the final data set with only the needed columns and downloaded
 
 We also ran some initial calculations to ensure there was no missing data, or data that required cleaning from DANE. Since we were the ones creating the main variables (closest amenity distance) from the blocks data and amenities data, we did not have cleaning issues.
 
-The full code is available on "data_wrangling_medellin.qmd" in the repository for this project. We kept it separate from this file to ensure the viewer could focus only on the analysis, aiming for the best performance on this file.
+**The full code is available on "data_wrangling_medellin.qmd" in the repository for this project. We kept it separate from this file to ensure the viewer could focus only on the analysis, aiming for the best performance on this file.**
 
 ```{r}
 #Uploading the final version of the data set for analysis
@@ -543,7 +543,7 @@ med_test <-
 
 ```
 
-### Exploratory Data Analysis 
+#### Exploratory Data Analysis
 
 ```{r}
 

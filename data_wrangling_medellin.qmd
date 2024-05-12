@@ -1,16 +1,24 @@
 ---
-title: "Multidimensional Poverty"
-format: html
-editor: visual
+title: "Predicting Multidimensional Poverty using spatial data"
+subtitle: "Final project - Data Science for Public Policy"
+authors: "Jasmine Jha, David Gentili, Duana Blach, Maddie Dimarco"
+execute:
+  warning: false
+  message: false
+format:
+  html:
+    embed-resources: true
 ---
 
-## Quarto
+### Description
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+This file should be used to do the initial data cleaning and wrangling for the project "Predicting Multidimensional Poverty using spatial data". To do this, you can download the two primary data sets:
 
-## Set up
+1\. Multidimensional Poverty Index (MPI) calculated at the street block level for the city of Medellin from the National Department of Statistics of Colombia (DANE), available in: <https://geoportal.dane.gov.co/visipm/.> The MPI in this data set will be used as the outcome of interest in our analysis.
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+2\. As explanatory variables we will attempt to use the distance from each block to public infrastructure in the city. This information is downloaded from Open Street Map (OSM) using the library(osmdata).
+
+To run the analysis, you will need to run the full code below. This will take several hours to run fully, as it requires significant computational power. Once you export the final data set as a csv, you can shift to the index.qmd file to start the analysis. We kept the data wrangling separate from the main analysis file to ensure the viewer could start by combining the data sets before they move to the full analysis. (Additional narrative on the data wrangling is provided within the index.qmd file).
 
 ```{r}
 library(sf)
